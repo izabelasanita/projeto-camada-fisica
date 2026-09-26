@@ -13,6 +13,7 @@ dependencies = []
 [project.optional-dependencies]
 audio = ["numpy>=1.26", "sounddevice>=0.4.6"]
 dev = ["pytest>=8.0", "ruff>=0.6"]
+ui = ["streamlit>=1.38"]
 
 [project.scripts]
 camada-fisica = "camada_fisica.cli:main"
@@ -30,7 +31,4 @@ target-version = "py39"
 [tool.ruff.lint]
 select = ["E", "F", "I"]
 
-[project.optional-dependencies]
-ui = [
-    "streamlit>=1.38",
-]
+
