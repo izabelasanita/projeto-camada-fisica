@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "camada-fisica-som"
+version = "0.1.0"
+description = "Comunicação digital usando ondas sonoras como meio físico."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.optional-dependencies]
+audio = ["numpy>=1.26", "sounddevice>=0.4.6"]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[project.scripts]
+camada-fisica = "camada_fisica.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[project.optional-dependencies]
+ui = [
+    "streamlit>=1.38",
+]
