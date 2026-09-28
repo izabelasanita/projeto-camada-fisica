@@ -18,3 +18,9 @@ def test_parser_accepts_test_mic_options():
     assert args.test_mic is True
     assert args.duration == 1.5
     assert args.sample_rate == 16000
+
+
+def test_parser_accepts_metodo1():
+    args = build_parser().parse_args(["--metodo1", "--sample-rate", "22050"])
+    assert args.metodo1 is True
+    assert args.sample_rate == 22050
