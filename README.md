@@ -78,6 +78,30 @@ amostragem, clique em **Iniciar captura**, emita o sinal sonoro desejado e
 clique em **Encerrar captura** para ver as amostras, a duração e o status de
 validação (pronto ou não para a recepção).
 
+## Detecção de erros por paridade (Método 1)
+
+O módulo `camada_fisica.paridade` implementa o mecanismo de detecção de
+erros por paridade par utilizado nos quadros do Método 1. Cada quadro é
+formado por 8 bits de dados e 1 bit de paridade:
+
+- **Calcular o bit de paridade**: `calcular_paridade(bits)` recebe os 8 bits
+  de dados e calcula o bit de paridade par. Quando a quantidade de bits `1`
+  nos dados é par, a paridade é `0`; quando é ímpar, a paridade é `1`.
+- **Montar o quadro de 9 bits**: `montar_quadro(bits)` utiliza os 8 bits de
+  dados e adiciona o bit de paridade calculado, formando o quadro completo
+  de 9 bits.
+- **Validar a paridade de um quadro recebido**: `validar_paridade(quadro)`
+  separa os 8 bits de dados do bit de paridade recebido, calcula a paridade
+  esperada e compara os dois valores.
+- **Identificar quadros válidos e corrompidos**: a validação retorna `True`
+  quando a paridade recebida está correta e `False` quando há divergência,
+  permitindo identificar se o quadro está válido ou corrompido.
+
+Para testes automatizados, foram criados testes para diferentes sequências
+de 8 bits, verificando o cálculo da paridade, a montagem dos quadros e a
+validação de quadros válidos e corrompidos. Os testes estão disponíveis em
+`tests/test_paridade.py`.
+
 ## Equipe
 
 | Integrante | GitHub |
