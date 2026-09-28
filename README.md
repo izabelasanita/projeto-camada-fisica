@@ -116,3 +116,41 @@ validação de quadros válidos e corrompidos. Os testes estão disponíveis em
 Este projeto é distribuído sob a **MIT License**.
 
 Consulte o arquivo [`LICENSE`](LICENSE) para mais informações.
+
+## Recepção do Método 1 (batidas → bits)
+
+O módulo `camada_fisica.metodo1` converte as amostras capturadas pelo
+microfone na sequência de bits do Método 1 e a envia para a verificação de
+paridade par:
+
+- **Mapear os picos sonoros**: `detectar_batidas()` calcula a envoltória do
+  sinal (média móvel do módulo), aplica um limiar (o maior entre um valor
+  absoluto e uma fração do pico da gravação) e registra o instante de cada
+  batida. Regiões a menos de 80 ms uma da outra são a mesma batida
+  (ressonância do impacto).
+- **Padronizar bit 0 e bit 1**: `agrupar_batidas()` separa os símbolos pelos
+  silêncios e `grupos_para_bits()` aplica a regra
+  `silêncio + 1 batida + silêncio = 0` e
+  `silêncio + 2 batidas + silêncio = 1`. Grupos com outra quantidade de
+  batidas viram símbolo inválido (`?`) e reprovam o quadro.
+- **Gerar a sequência de bits**: `montar_quadros()` divide os bits em quadros
+  de 9 (8 dados + paridade); bits sobrando são descartados com aviso.
+- **Enviar para a paridade par**: `avaliar_quadro()` usa
+  `paridade.validar_paridade()` e marca cada quadro como **SUCESSO** ou
+  **FALHA DE TRANSMISSÃO**.
+
+`decodificar_metodo1(amostras, taxa)` executa todo o pipeline.
+
+> **Calibração:** os tempos ficam em `ConfigMetodo1`. O limiar que separa
+> "duas batidas do mesmo bit" de "bits diferentes" é estimado
+> automaticamente a partir dos intervalos da gravação (com padrão de 0,6 s);
+> ajuste `limiar_grupo_s`, `fracao_pico` e `limiar_absoluto` conforme o ritmo
+> do vídeo de referência e o ruído da sala.
+
+### Testando
+
+```bash
+pytest tests/test_metodo1.py -v      # sinais sintéticos, sem microfone
+camada-fisica --metodo1              # grava até ENTER e decodifica
+streamlit run app/streamlit_app.py   # seção "Recepção — Método 1"
+```

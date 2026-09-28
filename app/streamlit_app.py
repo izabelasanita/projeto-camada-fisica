@@ -10,6 +10,10 @@ from camada_fisica.audio_capture import (
     MicrophoneUnavailableError,
     is_ready_for_reception,
 )
+from camada_fisica.metodo1 import (
+    BITS_DADOS,
+    decodificar_metodo1,
+)
 
 st.set_page_config(
     page_title="Camada Física usando Som",
@@ -115,3 +119,36 @@ if samples is not None:
             "⚠️ FALHA DE CAPTURA: nenhum sinal de áudio válido foi detectado "
             "(silêncio, dados vazios ou inválidos). Tente novamente."
         )
+
+    if is_ready_for_reception(samples):
+        st.divider()
+        st.subheader("🥁 Recepção — Método 1 (batidas)")
+        resultado = decodificar_metodo1(samples, capture.config.sample_rate)
+        simbolo = lambda b: "?" if b is None else str(b)  # noqa: E731
+
+        st.write(f"**Batidas detectadas:** {len(resultado.tempos_batidas)}")
+        st.write(
+            "**Bits decodificados:** "
+            f"`{''.join(simbolo(b) for b in resultado.bits) or '(nenhum)'}`"
+        )
+
+        for n, quadro in enumerate(resultado.quadros, start=1):
+            dados = "".join(simbolo(b) for b in quadro.bits[:BITS_DADOS])
+            texto = (
+                f"Quadro {n}: `{dados}` | paridade "
+                f"`{simbolo(quadro.bits[BITS_DADOS])}` → **{quadro.status}**"
+            )
+            if quadro.valido:
+                st.success(texto)
+            else:
+                st.error(texto)
+
+        if resultado.bits_excedentes:
+            st.warning(
+                f"{len(resultado.bits_excedentes)} bit(s) sobrando: quadro "
+                "incompleto descartado."
+            )
+        if resultado.quadros:
+            st.write(f"**Mensagem recebida:** {resultado.mensagem!r}")
+        else:
+            st.warning("FALHA DE TRANSMISSÃO: nenhum quadro completo de 9 bits.")

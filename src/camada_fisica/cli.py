@@ -11,6 +11,7 @@ from .audio_capture import (
     MicrophoneUnavailableError,
     is_ready_for_reception,
 )
+from .metodo1 import decodificar_metodo1, formatar_resultado
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -24,6 +25,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--test-mic",
         action="store_true",
         help="grava alguns segundos de áudio do microfone e mostra estatísticas",
+    )
+    parser.add_argument(
+        "--metodo1",
+        action="store_true",
+        help="recepção do Método 1: captura as batidas até ENTER e decodifica",
     )
     parser.add_argument(
         "--duration",
@@ -69,8 +75,33 @@ def _run_test_mic(duration: float, sample_rate: int) -> int:
     return 1
 
 
+def _run_metodo1(sample_rate: int) -> int:
+    capture = AudioCapture()
+    try:
+        capture.set_sample_rate(sample_rate)
+        info = AudioCapture.check_microphone_access()
+        print(f"Microfone detectado: {info['name']}")
+        capture.start()
+    except (MicrophoneUnavailableError, ValueError) as exc:
+        print(f"[ERRO] {exc}")
+        return 1
+
+    input("Gravando... faça as batidas do Método 1 e pressione ENTER para encerrar.")
+    samples = capture.stop()
+
+    if not is_ready_for_reception(samples):
+        print("[FALHA DE CAPTURA] Nenhum sinal de áudio válido foi detectado.")
+        return 1
+
+    resultado = decodificar_metodo1(samples, sample_rate)
+    print(formatar_resultado(resultado))
+    return 0 if resultado.todos_validos else 1
+
+
 def main() -> int:
     args = build_parser().parse_args()
+    if args.metodo1:
+        return _run_metodo1(args.sample_rate)
     if args.test_mic:
         return _run_test_mic(args.duration, args.sample_rate)
     if args.check:
