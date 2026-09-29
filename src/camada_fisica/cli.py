@@ -11,6 +11,15 @@ from .audio_capture import (
     MicrophoneUnavailableError,
     is_ready_for_reception,
 )
+
+from .audio_generation import text_to_audio
+
+from .audio_output import (
+    SpeakerUnavailableError,
+    check_speaker_access,
+    play_audio,
+)
+
 from .metodo1 import decodificar_metodo1, formatar_resultado
 
 
@@ -42,6 +51,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=DEFAULT_SAMPLE_RATE,
         help=f"taxa de amostragem em Hz (padrão: {DEFAULT_SAMPLE_RATE})",
+    )
+    parser.add_argument(
+    "--send",
+    metavar="TEXTO",
+    help="transmite um texto pelo alto-falante usando o Método 1",
     )
     return parser
 
@@ -98,16 +112,51 @@ def _run_metodo1(sample_rate: int) -> int:
     return 0 if resultado.todos_validos else 1
 
 
+def _run_send(text: str, sample_rate: int) -> int:
+    try:
+        info = check_speaker_access()
+
+        print(f"Alto-falante detectado: {info['name']}")
+        print(f"Transmitindo: {text!r}")
+
+        signal = text_to_audio(
+            text,
+            sample_rate=sample_rate,
+        )
+
+        print(f"Bits transmitidos: {len(text.encode('utf-8')) * 8}")
+        print(f"Amostras geradas: {len(signal)}")
+
+        play_audio(
+            signal,
+            sample_rate=sample_rate,
+        )
+
+        print("[SUCESSO] Transmissão concluída.")
+        return 0
+
+    except (SpeakerUnavailableError, ValueError) as exc:
+        print(f"[ERRO] {exc}")
+        return 1
+    
+
 def main() -> int:
     args = build_parser().parse_args()
+
     if args.metodo1:
         return _run_metodo1(args.sample_rate)
+
+    if args.send is not None:
+        return _run_send(args.send, args.sample_rate)
+
     if args.test_mic:
         return _run_test_mic(args.duration, args.sample_rate)
+
     if args.check:
         print(f"camada-fisica {__version__}: ambiente básico OK")
     else:
         build_parser().print_help()
+
     return 0
 
 

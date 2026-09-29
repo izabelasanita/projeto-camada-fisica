@@ -6,8 +6,8 @@ import numpy as np
 DEFAULT_SAMPLE_RATE = 44_100
 DEFAULT_FREQUENCY = 1_000
 DEFAULT_BEAT_DURATION = 0.08
-DEFAULT_SILENCE_DURATION = 0.08
-DEFAULT_INTER_BEAT_SILENCE = 0.04
+DEFAULT_SILENCE_DURATION = 0.50
+DEFAULT_INTER_BEAT_SILENCE = 0.20
 DEFAULT_FADE_DURATION = 0.005
 
 
@@ -141,3 +141,29 @@ def bits_to_audio(
     ]
 
     return np.concatenate(signals)
+
+def text_to_audio(
+    text: str,
+    sample_rate: int = DEFAULT_SAMPLE_RATE,
+    frequency: float = DEFAULT_FREQUENCY,
+    beat_duration: float = DEFAULT_BEAT_DURATION,
+    silence_duration: float = DEFAULT_SILENCE_DURATION,
+    inter_beat_silence: float = DEFAULT_INTER_BEAT_SILENCE,
+    fade_duration: float = DEFAULT_FADE_DURATION,
+) -> np.ndarray:
+    """Converte texto diretamente no sinal acústico do Método 1."""
+
+    from .codec import bytes_to_bits, text_to_bytes
+
+    data = text_to_bytes(text)
+    bits = bytes_to_bits(data)
+
+    return bits_to_audio(
+        bits,
+        sample_rate=sample_rate,
+        frequency=frequency,
+        beat_duration=beat_duration,
+        silence_duration=silence_duration,
+        inter_beat_silence=inter_beat_silence,
+        fade_duration=fade_duration,
+    )

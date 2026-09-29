@@ -102,21 +102,6 @@ de 8 bits, verificando o cálculo da paridade, a montagem dos quadros e a
 validação de quadros válidos e corrompidos. Os testes estão disponíveis em
 `tests/test_paridade.py`.
 
-## Equipe
-
-| Integrante | GitHub |
-| --- | --- |
-| Caio Botelho | [@caiobotelho1](https://github.com/caiobotelho1) |
-| Isabela Kawashima | [@isabelakawashima](https://github.com/isabelakawashima) |
-| Izabela Sanitá | [@izabelasanita](https://github.com/izabelasanita) |
-| Maria Mendes | [@mendeseduarda](https://github.com/mendeseduarda) |
-
-## Licença
-
-Este projeto é distribuído sob a **MIT License**.
-
-Consulte o arquivo [`LICENSE`](LICENSE) para mais informações.
-
 ## Recepção do Método 1 (batidas → bits)
 
 O módulo `camada_fisica.metodo1` converte as amostras capturadas pelo
@@ -154,3 +139,41 @@ pytest tests/test_metodo1.py -v      # sinais sintéticos, sem microfone
 camada-fisica --metodo1              # grava até ENTER e decodifica
 streamlit run app/streamlit_app.py   # seção "Recepção — Método 1"
 ```
+
+## Emissão do Método 1 (bits → batidas)
+
+O módulo `camada_fisica.audio_generation` converte a sequência de bits do Método 1 em um sinal acústico que pode ser reproduzido pelo alto-falante:
+
+* **Gerar a batida:** `gerar_batida()` cria uma onda senoidal na frequência definida, aplicando *fade in* e *fade out* para reduzir descontinuidades no sinal.
+
+* **Padronizar bit 0 e bit 1:** `bit_to_audio()` representa o bit `0` como `silêncio + 1 batida + silêncio` e o bit `1` como `silêncio + 2 batidas + silêncio`, com um intervalo entre as duas batidas.
+
+* **Gerar a sequência de bits:** `bits_to_audio()` concatena os sinais correspondentes a cada bit, formando um único sinal acústico na ordem da sequência recebida.
+
+* **Gerar a partir de texto:** `text_to_audio()` utiliza o `codec` para converter o texto em bytes e bits e, em seguida, gera o sinal acústico correspondente.
+
+Os parâmetros de duração, frequência e taxa de amostragem são definidos no módulo `audio_generation.py`.
+
+### Testando
+
+```bash
+pytest tests/test_audio_generation.py -v
+```
+
+Os testes verificam a geração dos bits `0` e `1`, a concatenação de sequências, os períodos de silêncio, a rejeição de valores inválidos e a geração de sinais a partir de sequências de bits.
+
+
+## Equipe
+
+| Integrante | GitHub |
+| --- | --- |
+| Caio Botelho | [@caiobotelho1](https://github.com/caiobotelho1) |
+| Isabela Kawashima | [@isabelakawashima](https://github.com/isabelakawashima) |
+| Izabela Sanitá | [@izabelasanita](https://github.com/izabelasanita) |
+| Maria Mendes | [@mendeseduarda](https://github.com/mendeseduarda) |
+
+## Licença
+
+Este projeto é distribuído sob a **MIT License**.
+
+Consulte o arquivo [`LICENSE`](LICENSE) para mais informações.

@@ -9,6 +9,7 @@ from camada_fisica.audio_generation import (
     DEFAULT_SILENCE_DURATION,
     bit_to_audio,
     bits_to_audio,
+    text_to_audio
 )
 
 
@@ -108,3 +109,11 @@ def test_empty_sequence_returns_empty_signal():
 def test_invalid_bit_inside_sequence_raises_error():
     with pytest.raises(ValueError):
         bits_to_audio([0, 1, 2, 0])
+
+def test_text_to_audio_generates_signal():
+    signal = text_to_audio("A")
+
+    assert isinstance(signal, np.ndarray)
+    assert signal.dtype == np.float32
+    assert len(signal) > 0
+    assert np.max(np.abs(signal)) > 0
