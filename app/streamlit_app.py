@@ -14,6 +14,9 @@ from camada_fisica.metodo1 import (
     BITS_DADOS,
     decodificar_metodo1,
 )
+from camada_fisica.audio_generation import text_to_audio
+from camada_fisica.audio_output import play_audio
+from camada_fisica.codec import text_to_bytes, bytes_to_bits
 
 st.set_page_config(
     page_title="Camada Física usando Som",
@@ -152,3 +155,50 @@ if samples is not None:
             st.write(f"**Mensagem recebida:** {resultado.mensagem!r}")
         else:
             st.warning("FALHA DE TRANSMISSÃO: nenhum quadro completo de 9 bits.")
+
+st.subheader("📡 Emissão — Método 1")
+
+st.write(
+    "Digite uma mensagem para convertê-la em bits e transmitir "
+    "por meio de sinais acústicos."
+)
+
+mensagem = st.text_input(
+    "Mensagem",
+    placeholder="Digite a mensagem que deseja transmitir..."
+)
+
+if st.button("Transmitir", type="primary"):
+    if not mensagem:
+        st.warning("Digite uma mensagem antes de transmitir.")
+    else:
+        try:
+            # Texto → bytes → bits
+            dados = text_to_bytes(mensagem)
+            bits = bytes_to_bits(dados)
+
+            st.subheader("Dados da transmissão")
+
+            st.write(f"**Mensagem:** {mensagem}")
+            st.write(f"**Quantidade de bits:** {len(bits)}")
+
+            st.code(
+                "".join(str(bit) for bit in bits),
+                language="text"
+            )
+
+            # Bits → sinal acústico
+            sinal = text_to_audio(mensagem)
+
+            st.write(f"**Amostras geradas:** {len(sinal)}")
+
+            # Reprodução pelo alto-falante
+            play_audio(
+                sinal,
+                sample_rate=44_100
+            )
+
+            st.success("Transmissão concluída!")
+
+        except Exception as exc:
+            st.error(f"Erro durante a transmissão: {exc}")
