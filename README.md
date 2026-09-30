@@ -162,6 +162,24 @@ pytest tests/test_audio_generation.py -v
 
 Os testes verificam a geração dos bits `0` e `1`, a concatenação de sequências, os períodos de silêncio, a rejeição de valores inválidos e a geração de sinais a partir de sequências de bits.
 
+## Emissão do Método 2 (bits → sinal 2-FSK)
+
+O módulo `camada_fisica.sinal_generator_2FSK` converte a sequência de bits do Método 2 em um sinal acústico utilizando modulação 2-FSK, no qual cada bit é representado por uma frequência diferente:
+
+* **Gerar o sinal de uma frequência:** `gerar_sinal_frequencia()` cria uma onda senoidal na frequência, duração, taxa de amostragem e amplitude definidas. A fase inicial e final são utilizadas para manter a continuidade entre diferentes símbolos.
+
+* **Gerar um bit 2-FSK:** `gerar_bit_2fsk()` converte um único bit em seu respectivo sinal acústico, utilizando uma frequência para o bit `0` e outra para o bit `1`.
+
+* **Gerar a sequência de bits:** `gerar_sinal_2fsk()` percorre a sequência de bits e concatena os sinais correspondentes, formando um único sinal acústico 2-FSK. A fase é mantida entre os símbolos para reduzir descontinuidades no sinal.
+
+* **Configurar os parâmetros:** as frequências dos bits `0` e `1`, a duração dos símbolos, a taxa de amostragem e a amplitude podem ser configuradas para permitir testes com diferentes condições de transmissão.
+
+Os parâmetros padrão utilizados são `1000 Hz` para o bit `0`, `2000 Hz` para o bit `1`, duração de `0,1 s` por símbolo, taxa de amostragem de `44100 Hz` e amplitude de `0,5`.
+
+### Testando
+
+```bash
+pytest tests/test_sinal_generator_2FSK.py -v
 
 ## Equipe
 
