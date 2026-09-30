@@ -14,7 +14,10 @@ from camada_fisica.audio_capture import (
 from camada_fisica.audio_generation import text_to_audio
 from camada_fisica.audio_output import play_audio
 from camada_fisica.codec import bytes_to_bits, text_to_bytes
-from camada_fisica.metodo1 import BITS_DADOS, decodificar_metodo1
+from camada_fisica.metodo1 import (
+    BITS_DADOS,
+    ReceptorMetodo1TempoReal
+    )
 
 
 st.set_page_config(
@@ -197,8 +200,8 @@ with aba_metodo1:
         st.subheader("🎙️ Recepção")
 
         st.write(
-            "Inicie a captura, faça as batidas do Método 1 e encerre "
-            "a captura para decodificar a mensagem."
+            "Inicie a captura e faça as batidas do Método 1. "
+            "Os bits identificados aparecerão em tempo real."
         )
 
         if "audio_capture" not in st.session_state:
@@ -206,6 +209,12 @@ with aba_metodo1:
 
         if "captured_samples" not in st.session_state:
             st.session_state.captured_samples = None
+
+        if "resultado_metodo1" not in st.session_state:
+            st.session_state.resultado_metodo1 = None
+
+        if "receptor_metodo1_live" not in st.session_state:
+            st.session_state.receptor_metodo1_live = None
 
         capture: AudioCapture = st.session_state.audio_capture
 
@@ -229,14 +238,26 @@ with aba_metodo1:
             ):
                 try:
                     capture.set_sample_rate(sample_rate)
+
                     AudioCapture.check_microphone_access()
-                    capture.start()
+
+                    st.session_state.receptor_metodo1_live = (
+                        ReceptorMetodo1TempoReal(
+                            sample_rate
+                        )
+                    )
+
+                    st.session_state.resultado_metodo1 = None
                     st.session_state.captured_samples = None
+
+                    capture.start()
+
                     st.rerun()
 
                 except MicrophoneUnavailableError as exc:
                     st.error(
-                        f"Não foi possível acessar o microfone: {exc}"
+                        "Não foi possível acessar o "
+                        f"microfone: {exc}"
                     )
 
                 except ValueError as exc:
@@ -248,104 +269,193 @@ with aba_metodo1:
                 disabled=not capture.is_capturing,
                 key="encerrar_captura",
             ):
-                st.session_state.captured_samples = capture.stop()
+                samples = capture.stop()
+
+                st.session_state.captured_samples = samples
+
+                receptor = (
+                    st.session_state.receptor_metodo1_live
+                )
+
+                if receptor is None:
+                    receptor = ReceptorMetodo1TempoReal(
+                        capture.config.sample_rate
+                    )
+
+                    st.session_state.receptor_metodo1_live = (
+                        receptor
+                    )
+
+                st.session_state.resultado_metodo1 = (
+                    receptor.processar(
+                        samples,
+                        finalizar=True,
+                    )
+                )
+
                 st.rerun()
 
-        if capture.is_capturing:
-            st.warning(
-                "🔴 Capturando áudio. Faça as batidas e depois "
-                "encerre a captura."
+        def mostrar_resultado_metodo1(resultado):
+            simbolo = (
+                lambda bit: "?"
+                if bit is None
+                else str(bit)
             )
 
-        samples = st.session_state.captured_samples
-
-        if samples is not None:
-            st.write(
-                f"**Amostras capturadas:** {len(samples)}"
-            )
-            st.write(
-                f"**Duração:** "
-                f"{capture.get_capture_duration():.2f} segundos"
+            bits_decodificados = "".join(
+                simbolo(bit)
+                for bit in resultado.bits
             )
 
-            if is_ready_for_reception(samples):
-                st.success(
-                    "✅ Captura realizada. "
-                    "Os dados estão prontos para decodificação."
-                )
+            st.write("**Bits identificados:**")
 
-                resultado = decodificar_metodo1(
-                    samples,
-                    capture.config.sample_rate,
-                )
+            st.code(
+                bits_decodificados or "(nenhum)",
+                language="text",
+            )
 
-                simbolo = (
-                    lambda bit: "?"
-                    if bit is None
-                    else str(bit)
-                )
+            st.caption(
+                f"{len(resultado.bits)} bit(s) "
+                "confirmado(s)"
+            )
 
-                st.write(
-                    f"**Batidas detectadas:** "
-                    f"{len(resultado.tempos_batidas)}"
-                )
-
-                bits_decodificados = "".join(
+            for numero, quadro in enumerate(
+                resultado.quadros,
+                start=1,
+            ):
+                dados = "".join(
                     simbolo(bit)
-                    for bit in resultado.bits
+                    for bit in quadro.bits[:BITS_DADOS]
+                )
+
+                paridade = simbolo(
+                    quadro.bits[BITS_DADOS]
+                )
+
+                texto_quadro = (
+                    f"Quadro {numero}: `{dados}` | "
+                    f"paridade `{paridade}` → "
+                    f"**{quadro.status}**"
+                )
+
+                if quadro.valido:
+                    st.success(texto_quadro)
+                else:
+                    st.error(texto_quadro)
+
+            if resultado.quadros:
+                st.write(
+                    "**Mensagem recebida:** "
+                    f"`{resultado.mensagem}`"
+                )
+
+        run_every = (
+            0.2
+            if capture.is_capturing
+            else None
+        )
+
+        @st.fragment(run_every=run_every)
+        def painel_recepcao_tempo_real():
+            if capture.is_capturing:
+                samples = (
+                    capture.get_captured_samples()
+                )
+
+                receptor = (
+                    st.session_state
+                    .receptor_metodo1_live
+                )
+
+                st.warning(
+                    "🔴 Capturando áudio..."
                 )
 
                 st.write(
-                    f"**Bits decodificados:** "
-                    f"`{bits_decodificados or '(nenhum)'}`"
+                    f"**Amostras capturadas:** "
+                    f"{len(samples)}"
                 )
 
-                for numero, quadro in enumerate(
-                    resultado.quadros,
-                    start=1,
+                duracao = (
+                    len(samples)
+                    / capture.config.sample_rate
+                )
+
+                st.write(
+                    f"**Duração:** "
+                    f"{duracao:.2f} segundos"
+                )
+
+                if (
+                    receptor is not None
+                    and len(samples) > 0
                 ):
-                    dados = "".join(
-                        simbolo(bit)
-                        for bit in quadro.bits[:BITS_DADOS]
+                    resultado = receptor.processar(
+                        samples
                     )
 
-                    paridade = simbolo(
-                        quadro.bits[BITS_DADOS]
+                    mostrar_resultado_metodo1(
+                        resultado
                     )
 
-                    texto_quadro = (
-                        f"Quadro {numero}: `{dados}` | "
-                        f"paridade `{paridade}` → "
-                        f"**{quadro.status}**"
-                    )
-
-                    if quadro.valido:
-                        st.success(texto_quadro)
-                    else:
-                        st.error(texto_quadro)
-
-                if resultado.bits_excedentes:
-                    st.warning(
-                        f"{len(resultado.bits_excedentes)} bit(s) "
-                        "sobrando: quadro incompleto descartado."
-                    )
-
-                if resultado.quadros:
-                    st.write(
-                        f"**Mensagem recebida:** "
-                        f"`{resultado.mensagem}`"
-                    )
                 else:
-                    st.error(
-                        "❌ FALHA DE TRANSMISSÃO: nenhum quadro "
-                        "completo foi recebido."
+                    st.write(
+                        "**Bits identificados:**"
+                    )
+
+                    st.code(
+                        "(aguardando sinal)",
+                        language="text",
                     )
 
             else:
-                st.warning(
-                    "⚠️ A captura não contém um sinal de áudio válido."
+                resultado = (
+                    st.session_state
+                    .resultado_metodo1
                 )
 
+                samples = (
+                    st.session_state
+                    .captured_samples
+                )
+
+                if (
+                    resultado is not None
+                    and samples is not None
+                ):
+                    st.write(
+                        f"**Amostras capturadas:** "
+                        f"{len(samples)}"
+                    )
+
+                    duracao = (
+                        len(samples)
+                        / capture.config.sample_rate
+                    )
+
+                    st.write(
+                        f"**Duração:** "
+                        f"{duracao:.2f} segundos"
+                    )
+
+                    if is_ready_for_reception(
+                        samples
+                    ):
+                        st.success(
+                            "✅ Captura encerrada."
+                        )
+
+                        mostrar_resultado_metodo1(
+                            resultado
+                        )
+
+                    else:
+                        st.warning(
+                            "⚠️ A captura não contém "
+                            "um sinal de áudio válido."
+                        )
+
+        painel_recepcao_tempo_real()
 
 # ---------------------------------------------------------------------
 # Método 2
