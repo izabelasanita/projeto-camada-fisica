@@ -180,6 +180,7 @@ Os parâmetros padrão utilizados são `1000 Hz` para o bit `0`, `2000 Hz` para 
 
 ```bash
 pytest tests/test_sinal_generator_2FSK.py -v
+```
 
 ## Equipe
 
