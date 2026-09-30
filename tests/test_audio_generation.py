@@ -5,6 +5,7 @@ np = pytest.importorskip("numpy")
 from camada_fisica.audio_generation import (
     DEFAULT_BEAT_DURATION,
     DEFAULT_FREQUENCY,
+    DEFAULT_INTER_BEAT_SILENCE,
     DEFAULT_SAMPLE_RATE,
     DEFAULT_SILENCE_DURATION,
     bit_to_audio,
@@ -47,7 +48,7 @@ def test_bit_one_generates_two_beats():
     )
 
     inter_beat_samples = int(
-        round(0.04 * sample_rate)
+        round(DEFAULT_INTER_BEAT_SILENCE * sample_rate)
     )
 
     assert len(signal) == (
