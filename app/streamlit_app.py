@@ -11,9 +11,12 @@ from camada_fisica.audio_capture import (
     MicrophoneUnavailableError,
     is_ready_for_reception,
 )
-from camada_fisica.audio_generation import text_to_audio
+from camada_fisica.audio_generation import (
+    text_to_audio,
+    text_to_frame_bits
+)
 from camada_fisica.audio_output import play_audio
-from camada_fisica.codec import bytes_to_bits, text_to_bytes
+
 from camada_fisica.metodo1 import (
     BITS_DADOS,
     ReceptorMetodo1TempoReal
@@ -157,22 +160,28 @@ with aba_metodo1:
                 st.warning("Digite uma mensagem antes de transmitir.")
             else:
                 try:
-                    dados = text_to_bytes(mensagem_envio)
-                    bits = bytes_to_bits(dados)
+                    bits = text_to_frame_bits(mensagem_envio)
                     sinal = text_to_audio(mensagem_envio)
 
                     st.write(
                         f"**Mensagem:** `{mensagem_envio}`"
                     )
                     st.write(
-                        f"**Quantidade de bits:** {len(bits)}"
+                        f"**Quantidade de bits transmitidos:** {len(bits)}"
                     )
 
-                    st.write("**Bits transmitidos:**")
-                    st.code(
-                        "".join(str(bit) for bit in bits),
-                        language="text",
-                    )
+                    st.write("**Quadros transmitidos:**")
+
+                    for inicio in range(0, len(bits), 9):
+                        quadro = bits[inicio:inicio + 9]
+
+                        dados_quadro = quadro[:8]
+                        paridade = quadro[8]
+
+                        st.code(
+                            f"{''.join(str(bit) for bit in dados_quadro)} | {paridade}",
+                            language="text",
+                        )
 
                     st.write(
                         f"**Amostras de áudio geradas:** {len(sinal)}"

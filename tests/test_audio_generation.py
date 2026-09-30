@@ -10,7 +10,8 @@ from camada_fisica.audio_generation import (
     DEFAULT_SILENCE_DURATION,
     bit_to_audio,
     bits_to_audio,
-    text_to_audio
+    text_to_audio,
+    text_to_frame_bits
 )
 
 
@@ -118,3 +119,33 @@ def test_text_to_audio_generates_signal():
     assert signal.dtype == np.float32
     assert len(signal) > 0
     assert np.max(np.abs(signal)) > 0
+
+def test_text_to_frame_bits_adds_parity():
+    bits = text_to_frame_bits("A")
+
+    assert len(bits) == 9
+
+    assert bits[:8] == [
+        0, 1, 0, 0,
+        0, 0, 0, 1,
+    ]
+
+    assert bits[8] == 0
+
+
+def test_text_to_frame_bits_multiple_bytes():
+    bits = text_to_frame_bits("AB")
+
+    assert len(bits) == 18
+
+
+def test_text_to_audio_includes_parity_bit():
+    bits = text_to_frame_bits("A")
+
+    sinal_esperado = bits_to_audio(bits)
+    sinal_real = text_to_audio("A")
+
+    assert np.array_equal(
+        sinal_real,
+        sinal_esperado,
+    )

@@ -5,9 +5,9 @@ import numpy as np
 
 DEFAULT_SAMPLE_RATE = 44_100
 DEFAULT_FREQUENCY = 1_000
-DEFAULT_BEAT_DURATION = 0.08
-DEFAULT_SILENCE_DURATION = 0.50
-DEFAULT_INTER_BEAT_SILENCE = 0.20
+DEFAULT_BEAT_DURATION = 0.15
+DEFAULT_SILENCE_DURATION = 0.80
+DEFAULT_INTER_BEAT_SILENCE = 0.30
 DEFAULT_FADE_DURATION = 0.005
 
 
@@ -142,6 +142,32 @@ def bits_to_audio(
 
     return np.concatenate(signals)
 
+def text_to_frame_bits(text: str) -> list[int]:
+    """
+    Converte um texto nos quadros do Método 1.
+
+    Cada byte do texto gera:
+        8 bits de dados + 1 bit de paridade par.
+
+    Exemplo:
+        'A' -> 01000001 + paridade
+    """
+
+    from .codec import bytes_to_bits, text_to_bytes
+    from .paridade import montar_quadro
+
+    dados = text_to_bytes(text)
+
+    bits_transmissao = []
+
+    for byte in dados:
+        bits_dados = bytes_to_bits(bytes([byte]))
+        quadro = montar_quadro(bits_dados)
+
+        bits_transmissao.extend(quadro)
+
+    return bits_transmissao
+
 def text_to_audio(
     text: str,
     sample_rate: int = DEFAULT_SAMPLE_RATE,
@@ -151,12 +177,14 @@ def text_to_audio(
     inter_beat_silence: float = DEFAULT_INTER_BEAT_SILENCE,
     fade_duration: float = DEFAULT_FADE_DURATION,
 ) -> np.ndarray:
-    """Converte texto diretamente no sinal acústico do Método 1."""
+    """
+    Converte texto diretamente no sinal acústico do Método 1.
 
-    from .codec import bytes_to_bits, text_to_bytes
+    Cada byte é transmitido como um quadro de 9 bits:
+    8 bits de dados + 1 bit de paridade par.
+    """
 
-    data = text_to_bytes(text)
-    bits = bytes_to_bits(data)
+    bits = text_to_frame_bits(text)
 
     return bits_to_audio(
         bits,
