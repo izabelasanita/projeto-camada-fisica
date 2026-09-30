@@ -12,6 +12,7 @@ from camada_fisica.codec import bytes_to_bits
 from camada_fisica.metodo1 import (
     STATUS_FALHA,
     STATUS_SUCESSO,
+    ReceptorMetodo1TempoReal,
     agrupar_batidas,
     avaliar_quadro,
     decodificar_metodo1,
@@ -146,3 +147,70 @@ def test_sem_quadro_completo_informa_falha():
     assert len(resultado.bits_excedentes) == 3
     texto = formatar_resultado(resultado)
     assert STATUS_FALHA in texto
+
+def test_tempo_real_nao_confirma_bit_antes_do_silencio():
+    sinal = gerar_sinal([0])
+
+    receptor = ReceptorMetodo1TempoReal(SR)
+
+    fim = int(0.7 * SR)
+
+    resultado = receptor.processar(
+        sinal[:fim]
+    )
+
+    assert resultado.bits == []
+
+
+def test_tempo_real_confirma_bit_apos_silencio():
+    sinal = gerar_sinal([0, 1])
+
+    receptor = ReceptorMetodo1TempoReal(SR)
+
+    fim_primeiro_bit = int(1.2 * SR)
+
+    resultado = receptor.processar(
+        sinal[:fim_primeiro_bit]
+    )
+
+    assert resultado.bits == [0]
+
+    fim_segundo_bit = int(2.5 * SR)
+
+    resultado = receptor.processar(
+        sinal[:fim_segundo_bit]
+    )
+
+    assert resultado.bits == [0, 1]
+
+
+def test_tempo_real_finaliza_ultimo_bit():
+    sinal = gerar_sinal([0])
+
+    receptor = ReceptorMetodo1TempoReal(SR)
+
+    fim = int(0.7 * SR)
+
+    resultado = receptor.processar(
+        sinal[:fim],
+        finalizar=True,
+    )
+
+    assert resultado.bits == [0]
+
+
+def test_tempo_real_monta_quadro_completo():
+    bits = montar_quadro(
+        bytes_to_bits(b"A")
+    )
+
+    sinal = gerar_sinal(bits)
+
+    receptor = ReceptorMetodo1TempoReal(SR)
+
+    resultado = receptor.processar(sinal)
+
+    assert resultado.bits == bits
+    assert len(resultado.quadros) == 1
+    assert resultado.quadros[0].valido
+    assert resultado.mensagem == "A"

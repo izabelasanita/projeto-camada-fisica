@@ -106,6 +106,105 @@ class ResultadoMetodo1:
     def todos_validos(self) -> bool:
         return bool(self.quadros) and all(q.valido for q in self.quadros)
 
+class ReceptorMetodo1TempoReal:
+    """
+    Processa a recepção do Método 1 durante a captura do áudio.
+
+    As amostras acumuladas são analisadas periodicamente e somente grupos
+    de batidas já encerrados por um período suficiente de silêncio são
+    convertidos em bits.
+
+    Isso evita interpretar uma única batida como bit 0 antes de saber se
+    uma segunda batida chegará para formar o bit 1.
+    """
+
+    def __init__(
+        self,
+        taxa_amostragem: int,
+        config: Optional[ConfigMetodo1] = None,
+    ) -> None:
+        if taxa_amostragem <= 0:
+            raise ValueError(
+                "A taxa de amostragem deve ser positiva."
+            )
+
+        self.taxa_amostragem = taxa_amostragem
+        self.config = config or ConfigMetodo1()
+
+        self.resultado = ResultadoMetodo1()
+
+    def reset(self) -> None:
+        """
+        Limpa o resultado da recepção atual.
+        """
+
+        self.resultado = ResultadoMetodo1()
+
+    def processar(
+        self,
+        amostras,
+        finalizar: bool = False,
+    ) -> ResultadoMetodo1:
+        """
+        Processa as amostras capturadas até o momento.
+
+        Durante a captura, somente grupos seguidos de silêncio suficiente
+        são considerados concluídos.
+
+        Quando ``finalizar`` é True, todos os grupos encontrados são
+        processados. Isso é usado ao encerrar a captura.
+        """
+
+        tempos = detectar_batidas(
+            amostras,
+            self.taxa_amostragem,
+            self.config,
+        )
+
+        limiar = self.config.limiar_grupo_s
+
+        if limiar is None:
+            limiar = LIMIAR_GRUPO_PADRAO_S
+
+        grupos = agrupar_batidas(
+            tempos,
+            limiar,
+        )
+
+        if finalizar:
+            grupos_confirmados = grupos
+
+        else:
+            duracao_atual = (
+                len(amostras) / self.taxa_amostragem
+            )
+
+            grupos_confirmados = [
+                grupo
+                for grupo in grupos
+                if grupo
+                and duracao_atual - grupo[-1] > limiar
+            ]
+
+        bits = grupos_para_bits(
+            grupos_confirmados
+        )
+
+        quadros_bits, excedentes = montar_quadros(bits)
+
+        self.resultado = ResultadoMetodo1(
+            tempos_batidas=tempos,
+            grupos=grupos_confirmados,
+            bits=bits,
+            quadros=[
+                avaliar_quadro(quadro)
+                for quadro in quadros_bits
+            ],
+            bits_excedentes=excedentes,
+            limiar_grupo_s=limiar,
+        )
+
+        return self.resultado
 
 # ----------------------------------------------------------------------
 # 1) Mapear os picos sonoros (batidas)
