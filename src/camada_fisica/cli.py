@@ -22,6 +22,14 @@ from .audio_output import (
 
 from .metodo1 import decodificar_metodo1, formatar_resultado
 
+from .metodo2 import decodificar_metodo2, formatar_resultado as formatar_resultado_metodo2
+
+from .sinal_generator_2FSK import (
+    DURACAO_SIMBOLO as DEFAULT_DURACAO_SIMBOLO,
+    FREQUENCIA_0 as DEFAULT_FREQUENCIA_0,
+    FREQUENCIA_1 as DEFAULT_FREQUENCIA_1,
+)
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -51,6 +59,29 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=DEFAULT_SAMPLE_RATE,
         help=f"taxa de amostragem em Hz (padrão: {DEFAULT_SAMPLE_RATE})",
+    )
+    parser.add_argument(
+        "--metodo2",
+        action="store_true",
+        help="recepção do Método 2 (2-FSK): captura até ENTER e decodifica",
+    )
+    parser.add_argument(
+        "--freq0",
+        type=float,
+        default=DEFAULT_FREQUENCIA_0,
+        help="frequência (Hz) correspondente ao bit 0 na recepção do Método 2 (padrão: {DEFAULT_FREQUENCIA_0} Hz)",
+    )
+    parser.add_argument(
+        "--freq1",
+        type=float,
+        default=DEFAULT_FREQUENCIA_1,
+        help="frequência (Hz) correspondente ao bit 1 na recepção do Método 2 (padrão: {DEFAULT_FREQUENCIA_1} Hz)",
+    )
+    parser.add_argument(
+        "--duracao-simbolo",
+        type=float,
+        default=DEFAULT_DURACAO_SIMBOLO,
+        help="duração (s) de cada símbolo na recepção do Método 2 (padrão: {DEFAULT_DURACAO_SIMBOLO} s)",
     )
     parser.add_argument(
     "--send",
@@ -112,6 +143,38 @@ def _run_metodo1(sample_rate: int) -> int:
     return 0 if resultado.todos_validos else 1
 
 
+def _run_metodo2(sample_rate: int, freq0: float, freq1: float, duracao_simbolo: float) -> int:
+    capture = AudioCapture()
+    try:
+        capture.set_sample_rate(sample_rate)
+        info = AudioCapture.check_microphone_access()
+        print(f"Microfone detectado: {info['name']}")
+        capture.start()
+    except (MicrophoneUnavailableError, ValueError) as exc:
+        print(f"[ERRO] {exc}")
+        return 1
+
+    input(
+        f"Gravando (bit 0 = {freq0:.0f} Hz, bit 1 = {freq1:.0f} Hz, "
+        f"{duracao_simbolo:.3f}s/símbolo)... pressione ENTER para encerrar."
+    )
+    samples = capture.stop()
+
+    if not is_ready_for_reception(samples):
+        print("[FALHA DE CAPTURA] Nenhum sinal de áudio válido foi detectado.")
+        return 1
+
+    resultado = decodificar_metodo2(
+        samples,
+        frequencia_0=freq0,
+        frequencia_1=freq1,
+        duracao_simbolo=duracao_simbolo,
+        taxa_amostragem=sample_rate,
+    )
+    print(formatar_resultado_metodo2(resultado))
+    return 0 if resultado["valido"] else 1
+
+
 def _run_send(text: str, sample_rate: int) -> int:
     try:
         info = check_speaker_access()
@@ -145,6 +208,11 @@ def main() -> int:
 
     if args.metodo1:
         return _run_metodo1(args.sample_rate)
+
+    if args.metodo2:
+        return _run_metodo2(
+            args.sample_rate, args.freq0, args.freq1, args.duracao_simbolo
+        )
 
     if args.send is not None:
         return _run_send(args.send, args.sample_rate)
