@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Equipe Camada Física usando Som
+# Este arquivo faz parte do projeto "camada-fisica-som", distribuído sob a
+# licença MIT. Consulte o arquivo LICENSE na raiz do repositório.
+
 """Interface de linha de comando para verificar a instalação local."""
 
 from __future__ import annotations
