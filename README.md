@@ -222,6 +222,63 @@ O trabalho permitiu compreender melhor a Camada Física ao aplicar seus conceito
 
 Os testes evidenciaram a sensibilidade do meio acústico ao ruído e a relação entre a separação dos símbolos e a velocidade da transmissão, especialmente no Método 1. Ambientes silenciosos favoreceram a recepção, mas a confiabilidade continua dependendo dos dispositivos, das condições do meio e da identificação correta dos sinais.
 
+## Como clonar e executar
+
+### Pré-requisitos
+
+- Git.
+- Python 3.9 ou superior.
+- Microfone e alto-falante para os testes de comunicação.
+
+### 1. Clonar o repositório
+
+```bash
+git clone https://github.com/izabelasanita/projeto-camada-fisica.git
+cd projeto-camada-fisica
+```
+
+### 2. Criar o ambiente virtual
+
+```bash
+python -m venv .venv
+```
+
+### 3. Ativar o ambiente virtual
+
+No Windows (PowerShell):
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+No Linux ou macOS:
+
+```bash
+source .venv/bin/activate
+```
+
+### 4. Instalar as dependências
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install -e ".[audio,ui,dev]"
+```
+
+### 5. Executar a aplicação
+
+```bash
+python -m streamlit run app/streamlit_app.py
+```
+
+Acesse o endereço exibido no terminal, geralmente `http://localhost:8501`. Permita o acesso ao microfone no sistema operacional para testar a recepção.
+
+### Executar os testes
+
+```bash
+python -m pytest
+```
+
+**Observação:** no Linux ou macOS, caso o comando `python` não esteja disponível, utilize `python3`.
 
 ## Equipe
 
