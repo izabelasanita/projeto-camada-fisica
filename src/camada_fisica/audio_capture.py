@@ -2,6 +2,7 @@
 # Copyright (c) 2026 Equipe Camada Física usando Som
 # Este arquivo faz parte do projeto "camada-fisica-som", distribuído sob a
 # licença MIT. Consulte o arquivo LICENSE na raiz do repositório.
+
 """Captura de áudio pelo microfone (front-end da Camada Física - Recepção).
 
 Este módulo é responsável por conceder acesso ao microfone do dispositivo e

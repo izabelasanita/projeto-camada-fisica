@@ -1,186 +1,227 @@
-# 🔊 Camada Física usando Som
+# Projeto Camada Física
 
-Projeto desenvolvido para a disciplina de **Redes de Computadores**, com o objetivo de explorar na prática conceitos relacionados à **Camada Física do modelo ISO/OSI**.
+Este projeto explora a transmissão e a recepção de dados por ondas sonoras, utilizando dois métodos: comunicação por batidas e modulação 2-FSK. O relatório apresenta os conceitos envolvidos, a implementação e as experiências da equipe nos testes.
 
-O projeto consiste no desenvolvimento de um sistema de comunicação digital capaz de **transmitir e receber informações binárias utilizando ondas sonoras como meio físico de transmissão**.
+## 1. Fundamentação Teórica
 
-Serão implementados dois métodos de comunicação acústica: um baseado em **eventos sonoros por impacto (batidas)** e um segundo método de modulação acústica voltado à obtenção de uma maior taxa de transmissão de dados.
+### Modelo ISO/OSI
 
->  **Projeto em desenvolvimento**
->
-> Este repositório ainda está em fase de desenvolvimento. A implementação, documentação técnica, resultados dos experimentos e demonstração serão adicionados conforme o andamento do projeto.
+O modelo OSI (Open Systems Interconnection), padronizado pela ISO, organiza a comunicação em redes em sete camadas. Cada uma possui funções específicas e oferece serviços à camada acima dela.
 
-## Desenvolvimento local
+| Camada | Função principal |
+| --- | --- |
+| 7. Aplicação | Oferece serviços às aplicações, como acesso à web, e-mail e transferência de arquivos. |
+| 6. Apresentação | Trata a representação dos dados, incluindo conversão de formatos, compressão e criptografia. |
+| 5. Sessão | Estabelece, gerencia e encerra sessões, coordenando o diálogo e pontos de sincronização. |
+| 4. Transporte | Realiza a comunicação entre processos, podendo oferecer segmentação, controle de fluxo e recuperação de erros. |
+| 3. Rede | Realiza o endereçamento lógico e o encaminhamento de pacotes entre redes. |
+| 2. Enlace de Dados | Organiza os dados em quadros e trata o acesso ao meio e a detecção de erros no enlace. |
+| 1. Física | Transmite bits pelo meio físico, representando-os por sinais elétricos, ópticos ou acústicos. |
 
-O projeto utiliza Python 3.9 ou superior. A dependência de áudio fica opcional neste início para manter a estrutura independente da escolha do segundo método.
+O foco do projeto é a Camada Física. A paridade e o CRC complementam a solução com a verificação dos quadros recebidos.
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate       # Windows: .venv\\Scripts\\activate
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-pytest
-camada-fisica --check
-```
+### Camada Física
 
-### Estrutura
+A Camada Física define como os bits são representados e transportados pelo meio de comunicação. Suas funções envolvem as características dos sinais e das interfaces, a duração dos símbolos e a sincronização entre transmissor e receptor. A interpretação das mensagens e o controle dos quadros pertencem a funções de camadas superiores.
 
-```text
-src/camada_fisica/  código do pacote
-tests/               testes automatizados
-pyproject.toml       configuração, dependências e ferramentas
-app/                 interface em streamlit
-```
+Neste projeto, o meio é o ar: o alto-falante transforma o sinal elétrico em ondas sonoras, e o microfone converte as variações de pressão em um sinal elétrico que pode ser digitalizado e processado.
 
-O segundo método de modulação será definido posteriormente; por isso, a base não assume FSK, ASK, PSK ou outra técnica.
+#### Sinais analógicos e digitais
 
-## Captura de áudio (Microfone)
+Um sinal analógico varia continuamente no tempo e na amplitude, como o som que se propaga pelo ar. Ele pode ser descrito por amplitude, relacionada à intensidade; frequência, que indica os ciclos por segundo em hertz (Hz); e fase, que indica a posição da onda em seu ciclo em relação a uma referência.
 
-O módulo `camada_fisica.audio_capture` implementa o acesso ao microfone e a
-captura das amostras de áudio brutas que alimentam os módulos de recepção
-(decodificação dos Métodos 1 e 2):
+Uma representação digital utiliza valores discretos. No projeto, a informação é uma sequência de bits, e o áudio é armazenado como amostras numéricas. A captura realiza a amostragem no tempo e a quantização da amplitude; a reprodução converte essas amostras em um sinal para o alto-falante. Dessa forma, uma onda sonora analógica transporta dados digitais, que o receptor recupera ao reconhecer seus símbolos.
 
-- **Configurar acesso ao microfone**: `AudioCapture.check_microphone_access()`
-  verifica se há um dispositivo de entrada disponível e retorna suas
-  informações (nome, canais, taxa padrão), levantando
-  `MicrophoneUnavailableError` caso o microfone não esteja acessível.
-- **Definir a taxa de amostragem inicial**: `AudioCapture.set_sample_rate(hz)`
-  configura a taxa (padrão: `44100 Hz`), validando a faixa aceitável
-  (`8000`–`96000 Hz`) antes do início da captura.
-- **Capturar amostras de áudio / iniciar e encerrar a captura**:
-  `capture.start()` inicia a gravação em um `sounddevice.InputStream`;
-  `capture.stop()` encerra a captura e retorna as amostras acumuladas
-  (`numpy.ndarray`). Há também `capture.capture_for(segundos)` para uma
-  captura bloqueante de duração fixa.
-- **Verificar se os dados podem ser usados pela recepção**:
-  `is_ready_for_reception(amostras)` confirma que os dados não estão vazios,
-  não contêm `NaN`/`inf` e não são silêncio total — sinalizando `SUCESSO`
-  ou `FALHA DE CAPTURA` antes de repassar os dados aos decodificadores.
+#### Largura de banda
 
-Para testes automatizados (sem hardware de áudio), a classe aceita um
-`stream_factory` que injeta um backend falso no lugar do PortAudio real —
-veja `tests/test_audio_capture.py`.
+A largura de banda corresponde à faixa de frequências transmitidas de forma útil pelo canal: `B = f_superior − f_inferior`, em Hz. Já a taxa de transmissão indica a quantidade de bits enviados por segundo, em bps.
 
-### Testando manualmente pelo terminal
+No canal acústico, os dispositivos, a distância e o ambiente influenciam a faixa utilizável. A velocidade da comunicação depende também da modulação e do ruído. No Método 2, a diferença entre os tons de 1000 Hz e 2000 Hz não define sozinha a largura de banda ocupada, pois as transições e a duração dos símbolos também afetam o espectro.
 
-```bash
-camada-fisica --test-mic --duration 3 --sample-rate 44100
-```
+#### Taxa de amostragem
 
-### Testando pela interface Streamlit
+A taxa de amostragem indica quantas medidas do sinal são realizadas por segundo. O projeto utiliza, por padrão, 44100 amostras/s, com intervalo entre amostras dado por `T_a = 1 / f_a`.
 
-```bash
-streamlit run app/streamlit_app.py
-```
+Para um sinal limitado em banda, o critério de Nyquist exige uma taxa maior que duas vezes sua maior frequência para a reconstrução ideal sem sobreposição espectral. Frequências acima da metade da taxa devem ser atenuadas antes da amostragem para evitar aliasing, que as faz aparecer como frequências diferentes. A frequência de Nyquist de 22050 Hz está acima dos tons utilizados no projeto.
 
-Na seção **"🎙️ Captura de áudio (Microfone) — Recepção"**, ajuste a taxa de
-amostragem, clique em **Iniciar captura**, emita o sinal sonoro desejado e
-clique em **Encerrar captura** para ver as amostras, a duração e o status de
-validação (pronto ou não para a recepção).
+Amostras e bits representam grandezas distintas: no Método 2, um símbolo de 0,1 s contém 4410 amostras e representa apenas um bit.
 
-## Detecção de erros por paridade (Método 1)
+#### Modulação
 
-O módulo `camada_fisica.paridade` implementa o mecanismo de detecção de
-erros por paridade par utilizado nos quadros do Método 1. Cada quadro é
-formado por 8 bits de dados e 1 bit de paridade:
+A modulação associa a informação a características de um sinal, como amplitude, frequência ou fase. O receptor realiza a demodulação para identificar os símbolos e recuperar os bits.
 
-- **Calcular o bit de paridade**: `calcular_paridade(bits)` recebe os 8 bits
-  de dados e calcula o bit de paridade par. Quando a quantidade de bits `1`
-  nos dados é par, a paridade é `0`; quando é ímpar, a paridade é `1`.
-- **Montar o quadro de 9 bits**: `montar_quadro(bits)` utiliza os 8 bits de
-  dados e adiciona o bit de paridade calculado, formando o quadro completo
-  de 9 bits.
-- **Validar a paridade de um quadro recebido**: `validar_paridade(quadro)`
-  separa os 8 bits de dados do bit de paridade recebido, calcula a paridade
-  esperada e compara os dois valores.
-- **Identificar quadros válidos e corrompidos**: a validação retorna `True`
-  quando a paridade recebida está correta e `False` quando há divergência,
-  permitindo identificar se o quadro está válido ou corrompido.
+O Método 1 representa os bits pela quantidade de batidas, separadas por silêncios. O Método 2 utiliza 2-FSK (Frequency Shift Keying), associando cada bit a uma frequência. Seus parâmetros e etapas são apresentados na seção de arquitetura.
 
-Para testes automatizados, foram criados testes para diferentes sequências
-de 8 bits, verificando o cálculo da paridade, a montagem dos quadros e a
-validação de quadros válidos e corrompidos. Os testes estão disponíveis em
-`tests/test_paridade.py`.
+#### Ruído e interferências
 
-## Recepção do Método 1 (batidas → bits)
+Ruído é uma perturbação indesejada que dificulta a interpretação do sinal. Conversas, ventiladores e sons externos podem interferir na captura. A relação sinal-ruído compara a potência do sinal desejado com a do ruído; valores menores tendem a dificultar a identificação dos símbolos.
 
-O módulo `camada_fisica.metodo1` converte as amostras capturadas pelo
-microfone na sequência de bits do Método 1 e a envia para a verificação de
-paridade par:
+A comunicação também pode sofrer atenuação com a distância, reverberação e distorção ou saturação dos dispositivos. Essas condições podem gerar falsas batidas ou prejudicar a identificação das frequências. Limiares e janelas de análise ajudam na recepção, enquanto a verificação de erros avalia os dados recuperados.
 
-- **Mapear os picos sonoros**: `detectar_batidas()` calcula a envoltória do
-  sinal (média móvel do módulo), aplica um limiar (o maior entre um valor
-  absoluto e uma fração do pico da gravação) e registra o instante de cada
-  batida. Regiões a menos de 80 ms uma da outra são a mesma batida
-  (ressonância do impacto).
-- **Padronizar bit 0 e bit 1**: `agrupar_batidas()` separa os símbolos pelos
-  silêncios e `grupos_para_bits()` aplica a regra
-  `silêncio + 1 batida + silêncio = 0` e
-  `silêncio + 2 batidas + silêncio = 1`. Grupos com outra quantidade de
-  batidas viram símbolo inválido (`?`) e reprovam o quadro.
-- **Gerar a sequência de bits**: `montar_quadros()` divide os bits em quadros
-  de 9 (8 dados + paridade); bits sobrando são descartados com aviso.
-- **Enviar para a paridade par**: `avaliar_quadro()` usa
-  `paridade.validar_paridade()` e marca cada quadro como **SUCESSO** ou
-  **FALHA DE TRANSMISSÃO**.
+### Detecção de Erros
 
-`decodificar_metodo1(amostras, taxa)` executa todo o pipeline.
+A detecção de erros acrescenta informações de verificação aos dados. O transmissor as calcula antes do envio, e o receptor repete o cálculo e compara os resultados. Uma divergência reprova o quadro; uma correspondência indica que nenhum erro foi detectado, mas não garante integridade, pois alguns padrões de alteração podem passar despercebidos. Detectar um erro também não significa corrigi-lo.
 
-> **Calibração:** os tempos ficam em `ConfigMetodo1`. O limiar que separa
-> "duas batidas do mesmo bit" de "bits diferentes" é estimado
-> automaticamente a partir dos intervalos da gravação (com padrão de 0,6 s);
-> ajuste `limiar_grupo_s`, `fracao_pico` e `limiar_absoluto` conforme o ritmo
-> do vídeo de referência e o ruído da sala.
+#### Paridade Par — Método 1
 
-### Testando
+A paridade par acrescenta um bit para tornar par a quantidade total de bits 1. Cada quadro contém 8 bits de dados e 1 de paridade. O cálculo é `p = (b₀ + b₁ + ... + b₇) mod 2`: uma quantidade par de bits 1 gera paridade 0; uma quantidade ímpar gera paridade 1.
 
-```bash
-pytest tests/test_metodo1.py -v      # sinais sintéticos, sem microfone
-camada-fisica --metodo1              # grava até ENTER e decodifica
-streamlit run app/streamlit_app.py   # seção "Recepção — Método 1"
-```
+| Dados | Quantidade de bits 1 | Paridade | Quadro |
+| --- | --- | --- | --- |
+| `10110000` | 3 | `1` | `101100001` |
+| `10110001` | 4 | `0` | `101100010` |
 
-## Emissão do Método 1 (bits → batidas)
+O receptor recalcula a paridade dos dados e a compara com o nono bit. Esse mecanismo detecta uma quantidade ímpar de inversões, inclusive no bit de paridade, mas uma quantidade par pode passar despercebida. Seu custo é de um bit adicional por byte, sem localizar ou corrigir o erro.
 
-O módulo `camada_fisica.audio_generation` converte a sequência de bits do Método 1 em um sinal acústico que pode ser reproduzido pelo alto-falante:
+#### CRC-8/SMBUS — Método 2
 
-* **Gerar a batida:** `gerar_batida()` cria uma onda senoidal na frequência definida, aplicando *fade in* e *fade out* para reduzir descontinuidades no sinal.
+O CRC (Cyclic Redundancy Check) interpreta os bits como coeficientes de um polinômio binário. Na formulação do CRC-8, acrescentam-se oito zeros aos dados e calcula-se o resto da divisão por um gerador de grau 8. A aritmética é módulo 2, com operações XOR, e o resto forma um byte de verificação.
 
-* **Padronizar bit 0 e bit 1:** `bit_to_audio()` representa o bit `0` como `silêncio + 1 batida + silêncio` e o bit `1` como `silêncio + 2 batidas + silêncio`, com um intervalo entre as duas batidas.
+| Parâmetro | Valor usado |
+| --- | --- |
+| Tamanho | 8 bits |
+| Polinômio gerador | `G(x) = x⁸ + x² + x + 1` |
+| Representação no código | `0x07`, com `x⁸` implícito |
+| Valor inicial e XOR final | `0x00` |
+| Reflexão de entrada e saída | Não utilizada |
 
-* **Gerar a sequência de bits:** `bits_to_audio()` concatena os sinais correspondentes a cada bit, formando um único sinal acústico na ordem da sequência recebida.
+O quadro tem o formato `[dados][1 byte de CRC]`. O receptor recalcula o CRC dos dados e o compara com o último byte. A posição e a ordem dos bits influenciam o resultado, tornando a verificação mais abrangente que a paridade simples.
 
-* **Gerar a partir de texto:** `text_to_audio()` utiliza o `codec` para converter o texto em bytes e bits e, em seguida, gera o sinal acústico correspondente.
+Esse gerador detecta inversões isoladas e rajadas com extensão de até 8 bits, medida do primeiro ao último bit alterado. Padrões maiores podem não ser detectados quando o polinômio do erro é divisível pelo gerador. O custo é de um byte por quadro, e o CRC não oferece correção geral dos dados.
 
-Os parâmetros de duração, frequência e taxa de amostragem são definidos no módulo `audio_generation.py`.
+## 2. Engenharia e Arquitetura das Soluções
 
-### Testando
+A implementação separa a conversão de dados (`codec`), a verificação dos quadros (`paridade` e `crc8`), a geração dos sinais (`audio_generation` e `sinal_generator_2FSK`), a reprodução (`audio_output`), a captura (`audio_capture`) e a decodificação (`metodo1` e `metodo2`). A interface Streamlit reúne as etapas de transmissão e recepção.
 
-```bash
-pytest tests/test_audio_generation.py -v
-```
+### Método 1 — Comunicação por batidas
 
-Os testes verificam a geração dos bits `0` e `1`, a concatenação de sequências, os períodos de silêncio, a rejeição de valores inválidos e a geração de sinais a partir de sequências de bits.
+O texto é convertido em bytes UTF-8, e cada byte recebe um bit de paridade. O gerador representa 0 por uma batida e 1 por duas, com silêncio antes e depois de cada símbolo. As batidas sintetizadas usam um tom de 1000 Hz por 0,15 s, com transições de amplitude de 5 ms. Os silêncios externos duram 0,80 s cada, e o intervalo entre as duas batidas do bit 1 é de 0,30 s.
 
-## Emissão do Método 2 (bits → sinal 2-FSK)
+O receptor calcula a envoltória pela média móvel da amplitude absoluta, identifica regiões acima do limiar e une regiões próximas para reduzir contagens duplicadas. Depois, agrupa as batidas pelos intervalos: uma gera 0, duas geram 1 e outras quantidades geram um símbolo inválido. A sequência é dividida em quadros de 9 bits para verificar a paridade; sobras são informadas como quadro incompleto.
 
-O módulo `camada_fisica.sinal_generator_2FSK` converte a sequência de bits do Método 2 em um sinal acústico utilizando modulação 2-FSK, no qual cada bit é representado por uma frequência diferente:
+#### Limiares, janelas de tempo e referência do vídeo
 
-* **Gerar o sinal de uma frequência:** `gerar_sinal_frequencia()` cria uma onda senoidal na frequência, duração, taxa de amostragem e amplitude definidas. A fase inicial e final são utilizadas para manter a continuidade entre diferentes símbolos.
+Os parâmetros de `ConfigMetodo1` permitem adaptar a recepção ao ritmo do vídeo de referência.
 
-* **Gerar um bit 2-FSK:** `gerar_bit_2fsk()` converte um único bit em seu respectivo sinal acústico, utilizando uma frequência para o bit `0` e outra para o bit `1`.
+| Parâmetro | Padrão | Finalidade |
+| --- | --- | --- |
+| Janela da envoltória | 5 ms | Suavizar oscilações rápidas. |
+| Limiar absoluto | 0,05 | Descartar sinais muito fracos. |
+| Fração do pico | 25% | Adaptar o limiar à intensidade da gravação. |
+| Intervalo de união de regiões | 80 ms | Reduzir a contagem duplicada de uma batida. |
+| Limiar de agrupamento | Automático; alternativa de 0,6 s | Separar batidas do mesmo bit de bits diferentes. |
 
-* **Gerar a sequência de bits:** `gerar_sinal_2fsk()` percorre a sequência de bits e concatena os sinais correspondentes, formando um único sinal acústico 2-FSK. A fase é mantida entre os símbolos para reduzir descontinuidades no sinal.
+O limiar de amplitude é o maior entre 0,05 e 25% do pico. Na gravação completa, o limiar de agrupamento é estimado pela maior separação proporcional entre os intervalos ordenados: quando a razão é pelo menos 1,6, usa-se a média geométrica dos intervalos que delimitam essa separação; caso contrário, utiliza-se 0,6 s. Também há configuração manual.
 
-* **Configurar os parâmetros:** as frequências dos bits `0` e `1`, a duração dos símbolos, a taxa de amostragem e a amplitude podem ser configuradas para permitir testes com diferentes condições de transmissão.
+Com os tempos padrão, os picos do bit 1 ficam separados por cerca de 0,45 s, enquanto os picos entre símbolos ficam separados por cerca de 1,75 s. Na recepção em tempo real, usa-se o limiar configurado ou 0,6 s, aguardando silêncio suficiente para confirmar o grupo e evitar classificar antecipadamente um bit 1 como 0.
 
-Os parâmetros padrão utilizados são `1000 Hz` para o bit `0`, `2000 Hz` para o bit `1`, duração de `0,1 s` por símbolo, taxa de amostragem de `44100 Hz` e amplitude de `0,5`.
+**Validação pendente:** registrar os intervalos medidos no vídeo de referência, os parâmetros utilizados e o resultado da decodificação. Os valores acima descrevem a implementação atual.
 
-### Testando
+### Método 2 — Modulação 2-FSK
 
-```bash
-pytest tests/test_sinal_generator_2FSK.py -v
-```
+O texto é convertido em bytes UTF-8 e recebe um byte de CRC-8/SMBUS. O quadro é convertido em bits e em tons senoidais, preservando a fase entre símbolos para reduzir descontinuidades.
+
+| Parâmetro | Valor padrão |
+| --- | --- |
+| Frequência do bit 0 | 1000 Hz |
+| Frequência do bit 1 | 2000 Hz |
+| Amplitude de pico | 0,5, em escala digital normalizada |
+| Duração do símbolo | 0,1 s |
+| Taxa de amostragem | 44100 amostras/s |
+| Amostras por símbolo | 4410 |
+| Verificação | Um byte de CRC-8/SMBUS por quadro |
+
+A amplitude digital não corresponde diretamente a um nível em decibéis: o volume depende também do dispositivo. Os parâmetros são configuráveis, e transmissor e receptor precisam usar valores compatíveis.
+
+#### Recepção e tratamento de ruídos
+
+O receptor converte a captura em mono e localiza o trecho ativo pela envoltória e pela energia nas frequências conhecidas. A busca espectral utiliza janelas de 20 ms, avanço de 10 ms e união de lacunas de até 50 ms. As regiões espectrais têm prioridade quando disponíveis, e a região mais longa é selecionada.
+
+O trecho ativo é dividido em símbolos de 0,1 s. Pequenas perdas nas bordas, de até 15% de um símbolo, podem ser compensadas com zeros no final. Em cada janela, o algoritmo de Goertzel estima a energia nos dois tons, e a maior determina o bit. No empate, escolhe-se 0; quando ambas as energias são zero, o símbolo é inválido. Ruídos ainda podem gerar decisões incorretas, verificadas posteriormente pelo CRC.
+
+#### Detecção e recuperação de erros
+
+Os bits são agrupados em bytes e submetidos à validação do CRC. A mensagem é liberada quando a verificação é aprovada.
+
+A recepção também tenta completar um último byte incompleto, assumindo que ele pertence ao CRC. São testadas as combinações dos bits ausentes, aceitando apenas uma solução válida. Isso exige que os dados estejam completos; como o tamanho do quadro não é informado explicitamente, a recuperação não garante a integridade de qualquer captura truncada nem corrige erros arbitrários nos dados.
+
+#### Taxa de transmissão teórica e prática
+
+Cada símbolo representa um bit e dura 0,1 s, resultando em `R = 10 bps`. Para `N` bytes de dados e um byte de CRC, a duração calculada é `T = 0,8 × (N + 1)` segundos, e a taxa útil é `R_útil = 10 × N / (N + 1)` bps, sem pausas ou falhas.
+
+| Bytes de dados | Bits com CRC | Duração calculada | Taxa útil calculada |
+| --- | --- | --- | --- |
+| 1 | 16 | 1,6 s | 5,00 bps |
+| 5 | 48 | 4,8 s | 8,33 bps |
+| 10 | 88 | 8,8 s | 9,09 bps |
+
+A taxa prática deve ser obtida por `R_prática = bits úteis recebidos corretamente / tempo total medido`, informando as condições do teste e quais tempos foram incluídos, como silêncios, processamento e novas tentativas.
+
+**Medição pendente:** registrar a taxa prática em bps e compará-la com os 10 bps nominais e com a taxa útil calculada para a mensagem testada.
+
+## 3. Divisão de Tarefas da Equipe
+
+| Integrante | Contribuições | Issues |
+| --- | --- | --- |
+| Maria Mendes | README inicial, estrutura do projeto, conversão de dados em bits e revisão dos requisitos antes da entrega. | #1, #2, #3 e #17 |
+| Caio Botelho | Captura de áudio pelo microfone, funcionalidade de identificação e identificação das frequências do Método 2. | #5, #8 e #16 |
+| Isabela Kawashima | Paridade par do Método 1 e geração do sinal do Método 2. | #4 e #15 |
+| Izabela Sanitá | Emissão acústica do Método 1 e CRC-8 do Método 2. | #11 e #14 |
+
+### Vídeo de demonstração
+
+Maria Mendes, Isabela Kawashima e Izabela Sanitá realizaram os testes e gravaram o vídeo. Caio Botelho ficou responsável pela edição.
+
+## 4. Desafios, Problemas e Soluções
+
+Os maiores problemas ocorreram nos testes com duas máquinas: os barulhos do ambiente atrapalharam a recepção, exigindo várias tentativas até obter uma transmissão bem-sucedida. A lentidão do Método 1 aumentou o tempo necessário para repetir os experimentos.
+
+### Ruídos externos
+
+O microfone registra tanto o sinal transmitido quanto os sons do ambiente. No Método 1, esses sons podem gerar falsas batidas ou ocultar eventos; no Método 2, podem dificultar a identificação das frequências. A solução adotada foi testar em lugares silenciosos, reduzindo a interferência e facilitando a recepção. Os limiares e as janelas de análise também ajudam, mas não eliminam todos os ruídos.
+
+### Lentidão do Método 1 e repetição dos testes
+
+Com os parâmetros padrão, um bit 0 ocupa 1,75 s e um bit 1 ocupa 2,20 s. Cada byte exige 9 símbolos, incluindo a paridade, tornando as tentativas demoradas. O ambiente silencioso reduz a necessidade de repetições, mas não altera essa velocidade. Diminuir os tempos exigiria nova calibração para preservar a separação entre símbolos.
+
+### Sincronização e verificação dos quadros
+
+Batidas adicionais ou não detectadas podem alterar o agrupamento do Método 1; no Método 2, um início mal identificado pode deslocar as janelas. Essas são possibilidades do funcionamento dos algoritmos, sem medições que permitam atribuir cada falha observada à perda de sincronismo.
+
+A paridade divergente ou um símbolo inválido reprova o quadro do Método 1 como **FALHA DE TRANSMISSÃO**. No Método 2, o CRC divergente indica **QUADRO CORROMPIDO**. As verificações ajudam a identificar inconsistências e a necessidade de nova tentativa. O relato dos testes é qualitativo, sem contagens de quadros reprovados ou taxas de erro registradas.
+
+## 5. Declaração do Uso de Inteligência Artificial
+
+A equipe utilizou IA generativa como apoio em todas as etapas do trabalho, incluindo o desenvolvimento do código e a documentação. O principal uso foi compreender o funcionamento dos métodos e orientar sua implementação, da transmissão à recepção e à verificação de erros. Os testes realizados pela equipe complementaram esse suporte, permitindo observar o sistema na prática.
+
+A IA também auxiliou na organização e revisão do README e das descrições das pull requests (PRs), tornando as alterações mais claras para os demais integrantes acompanharem o desenvolvimento.
+
+## 6. Resultados
+
+O vídeo de demonstração apresenta os testes de comunicação acústica realizados pela equipe.
+
+[![Assistir ao vídeo de demonstração no YouTube](https://img.youtube.com/vi/CMqcTUB_obg/hqdefault.jpg)](https://www.youtube.com/watch?v=CMqcTUB_obg)
+
+Clique na imagem para assistir ao vídeo no YouTube.
+
+### Verificação de erro do Método 1
+
+**Observação:** a demonstração de erro do Método 1 não foi incluída no vídeo por esquecimento da equipe. As imagens abaixo complementam os resultados com registros de uma recepção incompleta e de uma falha detectada pela paridade.
+
+**Recepção incompleta:** um quadro passou na verificação de paridade, mas três bits restantes foram descartados por não formarem um quadro completo.
+
+![Recepção do Método 1 com três bits restantes e quadro incompleto descartado](img/erro-metodo-1.jpeg)
+
+**Falha de transmissão:** o quadro recebido não passou na verificação de paridade, e a interface exibiu o status de falha.
+
+![Quadro do Método 1 reprovado pela paridade com status de falha de transmissão](img/erro2-metodo-1.png)
+
+## Conclusão
+
+O trabalho permitiu compreender melhor a Camada Física ao aplicar seus conceitos em uma comunicação real por som. As várias tentativas de transmissão contribuíram para um aprendizado mais concreto sobre detecção de sinais, temporização e verificação de erros do que o estudo apenas teórico.
+
+Os testes evidenciaram a sensibilidade do meio acústico ao ruído e a relação entre a separação dos símbolos e a velocidade da transmissão, especialmente no Método 1. Ambientes silenciosos favoreceram a recepção, mas a confiabilidade continua dependendo dos dispositivos, das condições do meio e da identificação correta dos sinais.
+
 
 ## Equipe
 
